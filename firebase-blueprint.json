@@ -1,0 +1,61 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user learning progress and preferences",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "masteryLevel": { "type": "number", "description": "0-100 progress" },
+        "streak": { "type": "number" },
+        "lastActive": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "email", "masteryLevel"]
+    },
+    "Task": {
+      "title": "Learning Task",
+      "description": "Individual learning tasks for the user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string", "enum": ["docs", "project", "video", "theory", "other"] },
+        "status": { "type": "string", "enum": ["todo", "in_progress", "completed"] },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "status", "category"]
+    },
+    "PomodoroSession": {
+      "title": "Pomodoro Session",
+      "description": "Log of completed study sessions",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "duration": { "type": "number", "description": "minutes" },
+        "type": { "type": "string", "enum": ["work", "short_break", "long_break"] },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "duration", "type", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Main user document"
+    },
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "User's study tasks"
+    },
+    "/users/{userId}/sessions/{sessionId}": {
+      "schema": "PomodoroSession",
+      "description": "Pomodoro session history"
+    }
+  }
+}

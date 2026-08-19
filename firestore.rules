@@ -1,0 +1,97 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3: Primitive Definition
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Entity Validations
+    function isValidUser(data) {
+      return data.keys().hasAll(['userId', 'email', 'masteryLevel', 'streak', 'lastActive', 'createdAt'])
+        && data.keys().size() == 6
+        && data.userId == request.auth.uid
+        && data.email is string
+        && data.email.size() <= 256
+        && data.masteryLevel is number
+        && data.masteryLevel >= 0 && data.masteryLevel <= 100
+        && data.streak is number
+        && data.lastActive is timestamp
+        && data.createdAt is timestamp;
+    }
+
+    function isValidTask(data) {
+      return data.keys().hasAll(['userId', 'title', 'description', 'category', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().size() >= 7
+        && data.userId == request.auth.uid
+        && data.title is string && data.title.size() <= 256
+        && data.description is string && data.description.size() <= 2000
+        && data.category in ['docs', 'project', 'video', 'theory', 'other']
+        && data.status in ['todo', 'in_progress', 'completed']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSession(data) {
+      return data.keys().hasAll(['userId', 'duration', 'type', 'timestamp'])
+        && data.keys().size() == 4
+        && data.userId == request.auth.uid
+        && data.duration is number
+        && data.type in ['work', 'short_break', 'long_break']
+        && data.timestamp is timestamp;
+    }
+
+    // Rules for Users
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidUser(incoming())
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt;
+
+      // Tasks subcollection
+      match /tasks/{taskId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidTask(incoming());
+        allow update: if isOwner(userId) && isValidTask(incoming())
+          && (
+            // Update status action
+            (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+            // General edit action
+            (incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'category', 'dueDate', 'updatedAt', 'status']))
+          )
+          && incoming().userId == existing().userId
+          && incoming().createdAt == existing().createdAt;
+        allow delete: if isOwner(userId);
+      }
+
+      // Sessions subcollection
+      match /sessions/{sessionId} {
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidSession(incoming());
+      }
+    }
+  }
+}
